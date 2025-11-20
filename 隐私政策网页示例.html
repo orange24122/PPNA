@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>社交类APP隐私政策合规检测系统</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 配置 Inter 字体和深色主题 */
+        :root {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* 优化滚动条样式 */
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        
+        /* 增强的深色主题颜色 */
+        .bg-card { background-color: #1f2937; }
+        .bg-sidebar { background-color: #111827; }
+        .border-primary { border-color: #4b5563; }
+        .text-primary { color: #d1d5db; }
+
+        /* 进度条样式 */
+        .progress-step {
+            transition: all 0.3s ease;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+        }
+        .progress-step.active {
+            background-color: #3b82f6;
+            color: white;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+            border-color: #3b82f6;
+        }
+        .progress-line {
+            height: 4px;
+            background-color: #4b5563;
+        }
+        .progress-line.active {
+            background: linear-gradient(to right, #3b82f6, #6366f1);
+            transition: width 1s ease;
+        }
+
+        /* 动画效果 */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 侧边导航栏样式 */
+        .nav-item {
+            transition: all 0.2s;
+            border-radius: 0.5rem;
+        }
+        .nav-item:hover {
+            background-color: #374151;
+            transform: translateX(2px);
+        }
+        .nav-item.active {
+            border-left: 4px solid #3b82f6;
+            background-color: #1f2937;
+            font-weight: 600;
+            color: #3b82f6;
+        }
+
+        /* 违规高亮样式 (Report Detail Page) */
+        .violation-highlight {
+            background-color: rgba(239, 68, 68, 0.2);
+            border-bottom: 2px solid #ef4444;
+            padding: 1px 3px;
+            border-radius: 4px;
+            cursor: pointer; 
+            transition: all 0.2s;
+            display: inline-block; /* 确保高亮能被 filterRisksByType 隐藏 */
+        }
+        .violation-highlight:hover {
+            background-color: rgba(239, 68, 68, 0.4);
+        }
+        .violation-highlight.selected {
+            background-color: #fca5a5; /* 选中时的更亮颜色 */
+            color: #1f2937;
+            font-weight: bold;
+            box-shadow: 0 0 8px rgba(252, 165, 165, 0.7);
+        }
+
+        /* 风险卡片样式 */
+        .risk-summary-card {
+            transition: all 0.3s;
+            border-left: 5px solid;
+        }
+        .risk-summary-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        .risk-summary-card.active {
+            transform: scale(1.02);
+            border: 2px solid #3b82f6; /* 选中时边框更明显 */
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+            #sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                z-index: 40;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease-in-out;
+            }
+            #sidebar.open {
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-gray-100 min-h-screen flex">
+
+    <!-- 模拟 API 密钥和数据 -->
+    <script>
+        const apiKey = ""; 
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    </script>
+    
+    <!-- 侧边导航栏 (Sidebar) -->
+    <nav id="sidebar" class="bg-sidebar w-64 flex-shrink-0 p-4 space-y-4 shadow-2xl z-40 md:static md:translate-x-0">
+        <div class="text-2xl font-bold text-blue-400 border-b border-primary pb-3 mb-4 flex justify-between items-center">
+            <span>合规检测系统</span>
+            <button id="closeSidebar" class="md:hidden text-gray-400 hover:text-white transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div class="space-y-2">
+            <!-- 核心功能 -->
+            <button class="nav-item w-full text-left p-3 flex items-center space-x-3 text-gray-300 active" data-page="upload">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                <span>政策上传与检测</span>
+            </button>
+            <button class="nav-item w-full text-left p-3 flex items-center space-x-3 text-gray-300" data-page="report-list">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 002 2h2m-2 4h.01m-4 0h.01m4 0h.01m-4 4h.01m4 0h.01"></path></svg>
+                <span>合规报告列表</span>
+            </button>
+
+            <!-- 管理员专属/辅助功能 -->
+            <div class="border-t border-primary pt-4 mt-4">
+                <p class="text-xs uppercase text-gray-500 mb-2">管理与辅助</p>
+                <button class="nav-item w-full text-left p-3 flex items-center space-x-3 text-gray-300 opacity-50" data-page="admin" disabled>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    <span>法规/案例库 (Admin)</span>
+                </button>
+                <button class="nav-item w-full text-left p-3 flex items-center space-x-3 text-gray-300" data-page="logs">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-4 4V3m-4 12h8m-8 4h8m-9-4v4a2 2 0 002 2h8a2 2 0 002-2v-4"></path></svg>
+                    <span>操作日志</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- 登录/登出按钮 -->
+        <div class="absolute bottom-4 left-4 right-4 border-t border-primary pt-4">
+            <button class="nav-item w-full text-left p-3 flex items-center space-x-3 text-red-400" data-page="login">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1m-4 0v-1a4 4 0 014-4h4a4 4 0 014 4v1m-6-1v1"></path></svg>
+                <span id="authStatus">退出/登录</span>
+            </button>
+        </div>
+    </nav>
+    
+    <!-- 移动端侧边栏遮罩 -->
+    <div id="sidebarOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden md:hidden"></div>
+    
+    <!-- 主内容区 -->
+    <div class="flex-grow flex flex-col">
+        <!-- 移动端汉堡菜单和标题 -->
+        <header class="md:hidden bg-sidebar p-4 shadow-lg flex justify-between items-center sticky top-0 z-20">
+             <button id="openSidebar" class="text-gray-200 hover:text-blue-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <h1 class="text-xl font-bold text-blue-400">合规系统</h1>
+            <div class="w-6"></div> <!-- Placeholder -->
+        </header>
+
+        <main id="mainContent" class="p-6 sm:p-10 flex-grow hide-scrollbar overflow-y-auto">
+            <!-- 内容将在此处动态加载 -->
+        </main>
+    </div>
+
+    <!-- 模态框 (用于登录指引、分块校验提示等) -->
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 items-center justify-center hidden">
+        <div id="modalBody" class="bg-card p-8 rounded-xl shadow-2xl w-full max-w-lg transition-all duration-300">
+            <!-- Modal Content -->
+        </div>
+    </div>
+
+
+    <script>
+        let currentPage = 'login';
+        let isUserLoggedIn = false;
+        let isUserAdmin = false; 
+        let detectionStatus = 'idle'; // idle, running, validation, completed
+        let selectedRiskId = null; // 用于报告详情页联动
+        let mockRisksData = []; // 用于在报告详情页之间共享数据
+
+        const mainContentEl = document.getElementById('mainContent');
+        const sidebarEl = document.getElementById('sidebar');
+        const sidebarOverlayEl = document.getElementById('sidebarOverlay');
+        const openSidebarBtn = document.getElementById('openSidebar');
+        const closeSidebarBtn = document.getElementById('closeSidebar');
+        const modalEl = document.getElementById('modal');
+        const modalBodyEl = document.getElementById('modalBody');
+        const authStatusEl = document.getElementById('authStatus');
+        
+        // 移动端侧边栏控制
+        openSidebarBtn.onclick = () => { sidebarEl.classList.add('open'); sidebarOverlayEl.classList.remove('hidden'); };
+        closeSidebarBtn.onclick = () => { sidebarEl.classList.remove('open'); sidebarOverlayEl.classList.add('hidden'); };
+        sidebarOverlayEl.onclick = () => { sidebarEl.classList.remove('open'); sidebarOverlayEl.classList.add('hidden'); };
+
+
+        // --- 辅助函数 ---
+
+        /**
+         * 模拟打开模态框
+         * @param {string} title 
+         * @param {string} contentHtml 
+         */
+        function openModal(title, contentHtml) {
+            modalBodyEl.innerHTML = `
+                <div class="flex justify-between items-center border-b border-primary pb-3 mb-4">
+                    <h3 class="text-2xl font-semibold text-blue-400">${title}</h3>
+                    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-100 transition">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+                <div>
+                    ${contentHtml}
+                </div>
+            `;
+            modalEl.classList.remove('hidden');
+            modalEl.classList.add('flex', 'fade-in');
+        }
+
+        /**
+         * 关闭模态框
+         */
+        function closeModal() {
+            modalEl.classList.remove('flex', 'fade-in');
+            modalEl.classList.add('hidden');
+        }
+
+        /**
+         * 模拟登录状态切换
+         */
+        function toggleAuth(role) {
+            isUserLoggedIn = !isUserLoggedIn;
+            isUserAdmin = (role === 'admin' && isUserLoggedIn);
+
+            if (isUserLoggedIn) {
+                authStatusEl.textContent = `(${isUserAdmin ? '管理员' : '普通用户'}) 退出`;
+                renderPage('upload'); 
+                if (!localStorage.getItem('hideSystemIntro')) {
+                    setTimeout(() => showSystemIntro(), 500);
+                }
+            } else {
+                authStatusEl.textContent = '退出/登录';
+                isUserAdmin = false;
+                renderPage('login');
+            }
+
+            const adminButton = document.querySelector('button[data-page="admin"]');
+            if (adminButton) {
+                if (isUserLoggedIn && isUserAdmin) {
+                    adminButton.disabled = false;
+                    adminButton.classList.remove('opacity-50');
+                } else {
+                    adminButton.disabled = true;
+                    adminButton.classList.add('opacity-50');
+                }
+            }
+        }
+
+        /**
+         * 登录后系统简介+使用指引弹窗
+         */
+        function showSystemIntro() {
+            const content = `
+                <div class="space-y-4 text-gray-300">
+                    <p>欢迎使用隐私政策合规检测系统！本系统旨在帮助您快速、精准地检测APP隐私政策的合规风险。</p>
+                    <ul class="list-disc list-inside space-y-2">
+                        <li>第一步：在**政策上传与检测**页面提交您的隐私政策（支持多种格式）。</li>
+                        <li>第二步：系统将自动执行**预处理、分块、匹配、评估**等流程。</li>
+                        <li>第三步：在**合规报告列表**中查看并下载详细的合规报告。</li>
+                    </ul>
+                    <div class="flex items-center space-x-2 pt-2">
+                        <input type="checkbox" id="noMoreShow" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-700 border-gray-600 rounded">
+                        <label for="noMoreShow" class="text-sm">下次不再显示</label>
+                    </div>
+                    <div class="flex justify-end pt-4">
+                        <button onclick="handleIntroClose()" class="px-6 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition font-medium">开始使用</button>
+                    </div>
+                </div>
+            `;
+            openModal('系统简介与使用指引', content);
+        }
+        
+        function handleIntroClose() {
+            if (document.getElementById('noMoreShow').checked) {
+                localStorage.setItem('hideSystemIntro', 'true');
+            }
+            closeModal();
+        }
+
+
+        /**
+         * 智能分块置信度校验弹窗 (模拟)
+         */
+        function showValidationModal() {
+            const content = `
+                <div class="space-y-4 text-gray-300">
+                    <p class="text-lg font-medium text-yellow-400">🚨 智能分块置信度提示</p>
+                    <p>部分文本块的自动分块置信度低于 90% (例如 85%)，可能影响最终检测准确性。</p>
+                    <p>建议您返回修改或手动校验分块结果。</p>
+                    <div class="flex justify-end space-x-4 pt-4">
+                        <button onclick="closeModal(); detectionStatus='idle'; renderPage('upload');" class="px-6 py-2 border border-gray-600 rounded-xl hover:bg-gray-700 transition font-medium">返回重新上传</button>
+                        <button onclick="closeModal(); startDetection(3);" class="px-6 py-2 bg-green-600 rounded-xl hover:bg-green-700 transition font-medium">继续检测</button>
+                    </div>
+                </div>
+            `;
+            openModal('分块结果校验 (Page III)', content);
+        }
+        
+        /**
+         * 模拟启动检测流程
+         * @param {number} startStep 从哪一步开始 (1-5)
+         */
+        function startDetection(startStep = 1) {
+            detectionStatus = 'running';
+            renderPage('upload'); 
+
+            const steps = ['预处理', '分块', '法规匹配', '案例检索', '风险评估'];
+            let currentStepIndex = startStep; // 1-based index
+
+            const interval = setInterval(() => {
+                currentStepIndex++;
+                renderPage('upload'); 
+
+                if (currentStepIndex > steps.length) {
+                    clearInterval(interval);
+                    detectionStatus = 'completed';
+                    renderPage('report-detail'); 
+                } else if (currentStepIndex === 3 && startStep === 1) { 
+                    clearInterval(interval);
+                    detectionStatus = 'validation';
+                    showValidationModal();
+                }
+            }, 1000);
+        }
+        
+        /**
+         * 处理风险点点击和高亮联动
+         * @param {number} riskId 
+         */
+        function handleRiskClick(riskId) {
+            // 1. 检查是否在隐藏的元素上点击
+            const wrapper = document.querySelector(`.risk-summary-card-wrapper[data-risk-id="${riskId}"]`);
+            if (wrapper && wrapper.classList.contains('hidden')) {
+                const selectEl = document.getElementById('riskFilterSelect');
+                if (selectEl && selectEl.value !== 'all') {
+                    selectEl.value = 'all';
+                    filterRisksByType('all');
+                }
+            }
+
+
+            // 2. 更新高亮标记
+            document.querySelectorAll('.violation-highlight').forEach(el => {
+                el.classList.remove('selected');
+            });
+            const highlights = document.querySelectorAll(`[data-risk-id="${riskId}"]`);
+            highlights.forEach(el => el.classList.add('selected'));
+            
+            // 3. 滚动到文本位置 (如果有多个高亮，滚动到第一个)
+            if (highlights.length > 0) {
+                highlights[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            // 4. 选中风险摘要卡片
+            document.querySelectorAll('.risk-summary-card').forEach(el => {
+                el.classList.remove('active');
+            });
+            const selectedCard = document.getElementById(`risk-card-${riskId}`);
+            if (selectedCard) {
+                selectedCard.classList.add('active');
+                selectedCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                // 5. 更新处理区内容 (模拟)
+                const risk = mockRisksData.find(r => r.id === riskId) || { id: riskId, note: '', category: '未知' };
+                document.getElementById('riskHandlingArea').innerHTML = `
+                    <p class="font-bold text-lg text-blue-400">违规项处理 (${risk.category} - #${riskId})</p>
+                    <p class="text-sm text-gray-300 mb-2">${risk.title} - ${risk.keyword}</p>
+                    <textarea id="riskNoteInput" rows="3" class="w-full p-3 bg-gray-700 rounded-lg text-white text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="添加处理备注...">${risk.note}</textarea>
+                    <div class="flex justify-between text-sm pt-2">
+                        <button class="text-blue-400 hover:text-blue-300 transition">查看优化示例</button>
+                        <button class="px-4 py-2 bg-green-600 rounded-xl hover:bg-green-700 transition font-medium">标记已处理</button>
+                    </div>
+                `;
+                // 6. 关联法规与案例
+                document.getElementById('associatedLawArea').innerHTML = renderAssociatedLaw(risk.lawId);
+            }
+
+            selectedRiskId = riskId;
+        }
+
+        /**
+         * 报告详情页：按风险类型筛选功能
+         * @param {string} category 选中的风险类别
+         */
+        function filterRisksByType(category) {
+            // 1. 过滤风险摘要卡片
+            const cardsContainer = document.getElementById('riskSummaryList');
+            if (!cardsContainer) return;
+
+            cardsContainer.querySelectorAll('.risk-summary-card-wrapper').forEach(wrapper => {
+                const riskCategory = wrapper.getAttribute('data-risk-category');
+                if (category === 'all' || riskCategory === category) {
+                    wrapper.classList.remove('hidden');
+                } else {
+                    wrapper.classList.add('hidden');
+                }
+            });
+
+            // 2. 过滤政策文本高亮
+            const policyTextContainer = document.getElementById('policyTextContainer');
+            if (!policyTextContainer) return;
+
+            const riskIdToCategory = {};
+            mockRisksData.forEach(r => {
+                riskIdToCategory[r.id] = r.category;
+            });
+
+            policyTextContainer.querySelectorAll('.violation-highlight').forEach(highlight => {
+                const riskId = parseInt(highlight.getAttribute('data-risk-id'));
+                const highlightCategory = riskIdToCategory[riskId];
+
+                if (category === 'all' || highlightCategory === category) {
+                    highlight.style.display = 'inline'; 
+                } else {
+                    highlight.style.display = 'none'; 
+                }
+            });
+            
+            // 3. 取消选中状态，避免选中项被隐藏
+            if (selectedRiskId) {
+                document.querySelectorAll('.violation-highlight.selected').forEach(el => el.classList.remove('selected'));
+                document.querySelectorAll('.risk-summary-card.active').forEach(el => el.classList.remove('active'));
+                document.getElementById('riskHandlingArea').innerHTML = `<p class="text-gray-500 text-sm p-4">请点击左侧或上方的风险项卡片进行处理。</p>`;
+                document.getElementById('associatedLawArea').innerHTML = `<p class="text-gray-500 text-sm p-4">点击风险项后，此处将显示关联法规。</p>`;
+                selectedRiskId = null;
+            }
+        }
+        
+        /**
+         * 渲染关联法规与案例 (模拟)
+         * @param {string} lawId 
+         */
+        function renderAssociatedLaw(lawId) {
+            return `
+                <div class="space-y-4">
+                    <!-- 关联法规 -->
+                    <div class="space-y-3 p-3 bg-gray-700/50 rounded-lg">
+                        <h3 class="text-lg font-medium text-gray-200 border-b border-gray-600 pb-2">关联法规 (<span class="text-red-400">核心</span>)</h3>
+                        <p class="text-sm bg-gray-800 p-3 rounded-lg border-l-4 border-red-400">
+                            <span class="font-semibold text-white">L001 - 个人信息保护法</span><br>
+                            <span class="text-gray-400 text-xs">第27条：收集个人信息，应当限于实现处理目的的最小范围。</span>
+                        </p>
+                        <details class="text-sm bg-gray-800 p-3 rounded-lg border-l-4 border-yellow-400">
+                            <summary class="font-semibold text-white cursor-pointer">参考法规 (点击展开)</summary>
+                            <span class="text-gray-400 text-xs mt-2 block">L002 - 网络安全法 第41条：网络运营者收集、使用个人信息，应当依法取得同意...</span>
+                        </details>
+                    </div>
+
+                    <!-- 案例参考 -->
+                    <div class="space-y-3 pt-4 border-t border-gray-700 p-3 bg-gray-700/50 rounded-lg">
+                        <h3 class="text-lg font-medium text-gray-200 border-b border-gray-600 pb-2">案例参考</h3>
+                        <div class="text-sm bg-gray-800 p-3 rounded-lg border-l-4 border-blue-400">
+                            <p class="font-semibold text-white">C01 - XX社交应用非法收集案</p>
+                            <p class="text-xs text-gray-400">来源: XX网信办 | 判罚结果: 责令整改并罚款 50 万元</p>
+                            <button class="text-xs text-blue-400 mt-1 hover:text-blue-300">查看更多</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+
+        // --- 页面渲染函数 ---
+
+        /**
+         * 渲染登录/注册页 (Page I)
+         */
+        function renderLoginPage() {
+            const html = `
+                <div class="flex items-center justify-center min-h-[80vh] fade-in">
+                    <div class="w-full max-w-sm bg-card p-8 rounded-2xl shadow-2xl space-y-6 border border-primary">
+                        <header class="text-center">
+                            <h2 class="text-3xl font-extrabold text-blue-400">系统登录</h2>
+                            <p class="text-gray-400 mt-1">社交类APP隐私政策合规检测</p>
+                        </header>
+                        
+                        <!-- 权限切换标签 -->
+                        <div class="bg-gray-700 p-1 rounded-xl flex mb-6">
+                            <button onclick="isUserAdmin=false; renderPage('login')" class="w-1/2 px-4 py-2 rounded-lg ${!isUserAdmin ? 'bg-blue-600 text-white font-semibold' : 'text-gray-400 hover:bg-gray-600'} transition duration-200">
+                                普通用户
+                            </button>
+                            <button onclick="isUserAdmin=true; renderPage('login')" class="w-1/2 px-4 py-2 rounded-lg ${isUserAdmin ? 'bg-blue-600 text-white font-semibold' : 'text-gray-400 hover:bg-gray-600'} transition duration-200">
+                                管理员
+                            </button>
+                        </div>
+
+                        <!-- 登录表单 -->
+                        <div class="space-y-4">
+                            <div class="relative">
+                                <input type="text" placeholder="手机号/账号" class="w-full p-3 pl-12 rounded-xl bg-gray-700 border border-gray-600 focus:border-blue-500 text-white" value="user123">
+                                <svg class="w-5 h-5 absolute top-1/2 transform -translate-y-1/2 left-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                            </div>
+                            <div class="relative">
+                                <input type="password" placeholder="密码/验证码" class="w-full p-3 pl-12 rounded-xl bg-gray-700 border border-gray-600 focus:border-blue-500 text-white" value="******">
+                                <svg class="w-5 h-5 absolute top-1/2 transform -translate-y-1/2 left-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                            </div>
+                            
+                            <div class="flex justify-between text-sm">
+                                <a href="#" class="text-blue-400 hover:text-blue-300">忘记密码</a>
+                                <a href="#" class="text-blue-400 hover:text-blue-300">注册新账号</a>
+                            </div>
+
+                            <button onclick="toggleAuth('${isUserAdmin ? 'admin' : 'user'}')" class="w-full py-3 bg-blue-600 text-white font-bold rounded-xl text-lg shadow-lg shadow-blue-500/50 hover:bg-blue-700 transition duration-300">
+                                登录${isUserAdmin ? ' (管理员)' : ''}
+                            </button>
+                        </div>
+                        
+                        <footer class="text-center text-xs text-gray-500 pt-4 border-t border-gray-700">
+                            <p>登录即表示您同意《用户服务协议》和《隐私政策》</p>
+                        </footer>
+                    </div>
+                </div>
+            `;
+            return html;
+        }
+
+        /**
+         * 渲染隐私政策上传与检测页 (Page II)
+         */
+        function renderUploadPage() {
+            const steps = ['预处理', '分块', '法规匹配', '案例检索', '风险评估'];
+            let currentStepIndex = detectionStatus === 'completed' ? 5 : (detectionStatus === 'validation' ? 2 : (detectionStatus === 'running' ? 3 : 0)); // 0-based index
+            const percentage = (currentStepIndex / steps.length) * 100;
+            
+            const progressHtml = `
+                <div class="flex justify-between items-start mb-4 pt-4 relative">
+                    ${steps.map((step, index) => {
+                        const isCompleted = index < currentStepIndex;
+                        const isActive = index === currentStepIndex && detectionStatus === 'running';
+                        return `
+                            <div class="flex flex-col items-center w-1/5 relative z-10">
+                                <div class="progress-step w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border-2 border-gray-600 ${isCompleted || isActive ? 'active' : 'bg-gray-700 text-gray-500'}">
+                                    ${index + 1}
+                                </div>
+                                <span class="mt-2 text-center text-xs ${isCompleted || isActive ? 'text-blue-400 font-semibold' : 'text-gray-400'}">${step}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                    <!-- 进度线 -->
+                    <div class="progress-line absolute top-[62px] left-[50px] right-[50px] overflow-hidden rounded-full">
+                        <div class="progress-line active" style="width: ${percentage}%;"></div>
+                    </div>
+                </div>
+            `;
+
+            const html = `
+                <div class="max-w-4xl mx-auto space-y-8 fade-in">
+                    <h1 class="text-3xl font-extrabold text-white border-b border-primary pb-3">政策上传与检测</h1>
+                    
+                    <!-- APP 基础信息填写 -->
+                    <div class="bg-card p-6 rounded-xl shadow-xl space-y-4 border border-primary">
+                        <h2 class="text-xl font-semibold text-blue-400">APP 基础信息</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <input type="text" placeholder="APP 名称 (e.g., 微聊)" class="p-3 rounded-lg bg-gray-700 border border-gray-600 focus:border-blue-500 text-white">
+                            <input type="text" placeholder="所属公司 (e.g., 腾马科技)" class="p-3 rounded-lg bg-gray-700 border border-gray-600 focus:border-blue-500 text-white">
+                            <input type="text" placeholder="版本号 (e.g., 3.2.1)" class="p-3 rounded-lg bg-gray-700 border border-gray-600 focus:border-blue-500 text-white">
+                        </div>
+                    </div>
+
+                    <!-- 文件上传区 -->
+                    <div class="bg-card p-6 rounded-xl shadow-xl space-y-4 border border-primary">
+                        <h2 class="text-xl font-semibold text-blue-400">隐私政策文件上传</h2>
+                        
+                        <!-- 文件拖拽区 (美化) -->
+                        <div class="file-drop-zone border-gray-600 p-10 rounded-xl text-center transition duration-200 cursor-pointer hover:bg-gray-700/50">
+                            <svg class="w-10 h-10 mx-auto text-blue-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0L8 8m4-4v12"></path></svg>
+                            <p class="text-gray-300 font-medium text-lg">拖放 PDF / HTML / TXT 文件到此</p>
+                            <p class="text-sm text-gray-500 mt-1">或 <span class="text-blue-400 font-semibold">点击上传</span>，支持批量文件上传</p>
+                        </div>
+
+                        <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                            <input type="url" placeholder="或输入网页链接 (URL) 进行检测" class="flex-grow w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:border-blue-500 text-white">
+                            <button class="w-full sm:w-auto px-4 py-3 bg-blue-600 rounded-xl hover:bg-blue-700 text-white transition">检测链接</button>
+                        </div>
+
+                        <!-- 文本清洗预览 -->
+                        <div class="pt-4 space-y-2 border-t border-primary">
+                            <h3 class="text-lg font-semibold text-gray-300">清洗后文本预览 <span class="text-xs text-gray-500">(支持手动编辑修改)</span></h3>
+                            <textarea rows="6" class="w-full p-4 rounded-lg bg-gray-700 border border-gray-600 text-white text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="清洗后的文本将在此处显示... (支持手动编辑修改)">
+[自动清洗后文本] ...我们非常重视您的个人信息和隐私保护。我们会根据法律法规要求，在您的同意下收集您的手机号码、设备信息、地理位置信息等，用于提供聊天、社交和推荐服务。
+                            </textarea>
+                            <div class="flex justify-between items-center">
+                                <button class="text-sm px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 transition text-white font-medium">恢复原始文本</button>
+                                <p class="text-sm text-gray-500">已输入 4500 字 / 建议字数 5000-8000 字</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 检测进度与控制 -->
+                    <div class="bg-card p-6 rounded-xl shadow-xl space-y-4 border border-primary">
+                        <h2 class="text-xl font-semibold text-blue-400">检测进度展示</h2>
+                        <!-- 优化后的进度条 -->
+                        <div class="relative pt-6 pb-4">
+                           ${progressHtml}
+                        </div>
+                        
+                        <!-- 控制按钮 -->
+                        <div class="flex justify-between pt-4 border-t border-primary">
+                            <button onclick="detectionStatus = 'idle'; renderPage('upload')" class="px-6 py-3 border border-gray-600 text-gray-300 rounded-xl hover:bg-gray-700 transition font-medium">取消检测</button>
+                            <button onclick="startDetection()" class="px-8 py-3 bg-green-600 text-white font-bold rounded-xl text-lg shadow-lg shadow-green-500/50 hover:bg-green-700 transition duration-300 disabled:opacity-50"
+                                ${detectionStatus === 'running' ? 'disabled' : ''}>
+                                ${detectionStatus === 'running' ? '检测进行中...' : '提交检测'}
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            `;
+            return html;
+        }
+
+        /**
+         * 渲染合规报告列表页 (Page IV)
+         */
+        function renderReportListPage() {
+            // 模拟数据
+            const reports = [
+                { id: 1001, time: '2025-11-16 10:30', app: '微聊', company: '腾马科技', risk: '高风险', rate: '55%', format: 'PDF' },
+                { id: 1002, time: '2025-11-15 14:00', app: '酷乐分享', company: '创易工作室', risk: '中风险', rate: '78%', format: 'HTML' },
+                { id: 1003, time: '2025-11-01 09:15', app: '微聊', company: '腾马科技', risk: '低风险', rate: '92%', format: 'PDF' },
+                { id: 1004, time: '2025-10-28 17:50', app: '萌宠日记', company: '爱宠网络', risk: '低风险', rate: '88%', format: 'TXT' },
+            ];
+            
+            const tableRowsHtml = reports.map(r => `
+                <tr class="border-b border-gray-700 hover:bg-gray-700 transition duration-150 cursor-pointer">
+                    <td class="p-4 text-sm font-medium text-gray-300">${r.time}</td>
+                    <td class="p-4 text-sm">${r.app}</td>
+                    <td class="p-4 text-sm">${r.company}</td>
+                    <td class="p-4 text-sm">
+                        <span class="px-3 py-1 text-xs font-semibold rounded-full ${r.risk === '高风险' ? 'bg-red-900 text-red-300' : (r.risk === '中风险' ? 'bg-yellow-900 text-yellow-300' : 'bg-green-900 text-green-300')}">
+                            ${r.risk}
+                        </span>
+                    </td>
+                    <td class="p-4 text-sm text-green-400 font-bold">${r.rate}</td>
+                    <td class="p-4 text-sm">${r.format}</td>
+                    <td class="p-4 text-sm flex space-x-2">
+                        <button onclick="renderPage('report-detail')" class="text-blue-400 hover:text-blue-300 transition">预览/详情</button>
+                        <button class="text-gray-400 hover:text-gray-300 transition">下载</button>
+                        <button class="text-gray-400 hover:text-gray-300 transition">分享 (1天)</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            const html = `
+                <div class="max-w-7xl mx-auto space-y-8 fade-in">
+                    <h1 class="text-3xl font-extrabold text-white border-b border-primary pb-3">合规报告列表</h1>
+
+                    <!-- 筛选与控制区 -->
+                    <div class="bg-card p-4 rounded-xl shadow-xl space-y-4 border border-primary">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0">
+                            <!-- 多条件筛选 -->
+                            <div class="flex flex-wrap gap-3">
+                                <select class="p-2 rounded-xl bg-gray-700 border border-gray-600 text-sm">
+                                    <option>筛选：检测时间</option>
+                                </select>
+                                <select class="p-2 rounded-xl bg-gray-700 border border-gray-600 text-sm">
+                                    <option>筛选：APP名称</option>
+                                </select>
+                                <select class="p-2 rounded-xl bg-gray-700 border border-gray-600 text-sm">
+                                    <option>筛选：风险等级</option>
+                                    <option>高风险</option>
+                                    <option>中风险</option>
+                                    <option>低风险</option>
+                                </select>
+                            </div>
+                            
+                            <!-- 批量操作 -->
+                            <div class="flex gap-3">
+                                <button class="px-4 py-2 text-sm bg-indigo-600 rounded-xl hover:bg-indigo-700 transition font-medium">批量下载报告 (ZIP)</button>
+                            </div>
+                        </div>
+
+                        <!-- 筛选状态标签 -->
+                        <div class="flex flex-wrap gap-2 text-sm pt-2 border-t border-gray-700">
+                            <span class="px-3 py-1 bg-blue-900 rounded-full text-blue-300 flex items-center">APP: 微聊 <button class="ml-2 text-xs hover:text-white">✕</button></span>
+                            <span class="px-3 py-1 bg-blue-900 rounded-full text-blue-300 flex items-center">风险: 高/中 <button class="ml-2 text-xs hover:text-white">✕</button></span>
+                        </div>
+                    </div>
+
+                    <!-- 报告表格 -->
+                    <div class="overflow-x-auto bg-card rounded-xl shadow-xl border border-primary">
+                        <table class="min-w-full divide-y divide-gray-700">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th class="p-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">检测时间</th>
+                                    <th class="p-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">APP名称</th>
+                                    <th class="p-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">所属公司</th>
+                                    <th class="p-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">风险等级</th>
+                                    <th class="p-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">合规率</th>
+                                    <th class="p-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">格式</th>
+                                    <th class="p-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-700">
+                                ${tableRowsHtml}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                </div>
+            `;
+            return html;
+        }
+
+        /**
+         * 渲染报告详情页 (Page V)
+         */
+        function renderReportDetailPage() {
+            // 模拟合规报告数据 (新增 category 字段)
+            const risks = [
+                { id: 1, type: '高风险', title: '过度收集个人信息', keyword: '地理位置权限', lawId: 'L001', solved: false, note: '', category: '信息收集' },
+                { id: 2, type: '中风险', title: '未提供撤回同意机制', keyword: '广告推荐目的', lawId: 'L002', solved: true, note: '已处理：已添加“一键关闭个性化推荐”按钮', category: '用户权利' },
+                { id: 3, type: '低风险', title: '客服联系方式不明确', keyword: '客服部门', lawId: 'L003', solved: false, note: '', category: '联系方式' },
+                { id: 4, type: '中风险', title: '未明确存储期限', keyword: '储存至删除', lawId: 'L004', solved: false, note: '', category: '信息存储' },
+                { id: 5, type: '高风险', title: '未告知第三方SDK集成', keyword: '第三方SDK', lawId: 'L005', solved: false, note: '', category: '信息共享' },
+            ];
+            
+            // 将数据存入全局变量供筛选函数使用
+            mockRisksData = risks;
+            
+            // 提取唯一类别用于筛选下拉框
+            const categories = [...new Set(risks.map(r => r.category))];
+
+            // 模拟政策文本
+            const policyText = `
+                <p>第一章 隐私政策引言。感谢您选择使用微聊服务。我们非常重视您的个人信息保护。</p>
+                <p>第二章 信息收集与使用。为了实现您的聊天功能，我们需要收集您的手机号码和设备识别码。此外，当您使用朋友圈功能时，我们会请求获取<span class="violation-highlight" data-risk-id="1">地理位置权限</span>，这是<span class="violation-highlight" data-risk-id="1">过度收集个人信息</span>的风险点，违反了最小必要原则。我们还集成了<span class="violation-highlight" data-risk-id="5">第三方SDK</span>用于数据分析，但<span class="violation-highlight" data-risk-id="5">未告知第三方SDK集成</span>及其目的。</p>
+                <p>第三章 信息的共享与公开。我们承诺除非获得您的明确授权，否则不会将您的个人信息共享给任何第三方公司，但为了<span class="violation-highlight" data-risk-id="2">广告推荐目的</span>，可能会与合作方共享去标识化的信息，但**未提供撤回同意的选项**。</p>
+                <p>第四章 信息的存储与期限。用户的聊天记录将<span class="violation-highlight" data-risk-id="4">储存至删除</span>。此表述不合规，<span class="violation-highlight" data-risk-id="4">未明确存储期限</span>。</p>
+                <p>第五章 您的权利。您有权访问、修改和删除您的个人信息。若您对本政策有任何疑问，请联系我们的<span class="violation-highlight" data-risk-id="3">客服部门</span>。该表述过于模糊，<span class="violation-highlight" data-risk-id="3">客服联系方式不明确</span>。</p>
+            `.trim();
+            
+            // 风险摘要卡片 HTML (新增 wrapper 和 category 属性)
+            const riskSummaryHtml = risks.map(r => {
+                const colorMap = {
+                    '高风险': 'border-red-600',
+                    '中风险': 'border-yellow-600',
+                    '低风险': 'border-green-600'
+                };
+                const bgMap = {
+                    '高风险': 'bg-red-900/20',
+                    '中风险': 'bg-yellow-900/20',
+                    '低风险': 'bg-green-900/20'
+                };
+
+                return `
+                    <div class="risk-summary-card-wrapper" data-risk-id="${r.id}" data-risk-category="${r.category}">
+                        <div id="risk-card-${r.id}" onclick="handleRiskClick(${r.id})" 
+                             class="risk-summary-card p-4 rounded-xl cursor-pointer mb-3 shadow-md ${colorMap[r.type]} ${bgMap[r.type]}">
+                            <div class="flex justify-between items-start">
+                                <span class="font-bold text-base ${r.type === '高风险' ? 'text-red-400' : (r.type === '中风险' ? 'text-yellow-400' : 'text-green-400')}">${r.type}: ${r.title}</span>
+                                <span class="text-xs px-2 py-0.5 rounded-full ${r.solved ? 'bg-green-600 text-white' : 'bg-gray-600 text-gray-300'}">${r.solved ? '已处理' : '待处理'}</span>
+                            </div>
+                            <p class="text-xs text-gray-400 mt-1 flex justify-between">
+                                <span><span class="text-indigo-300">${r.category}</span> | 关键词: ${r.keyword}</span>
+                                <span class="text-gray-500">ID: #${r.id}</span>
+                            </p>
+                            <p class="text-xs text-gray-500 mt-2 line-clamp-2">${r.note || '点击此处查看详情，并标记已处理。'}</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // 筛选下拉框 HTML
+            const filterSelectHtml = `
+                <select id="riskFilterSelect" onchange="filterRisksByType(this.value)" 
+                    class="text-sm px-4 py-2 bg-gray-700 rounded-xl border border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500 hover:bg-gray-600 transition">
+                    <option value="all" class="bg-gray-800">按类型筛选 (全部)</option>
+                    ${categories.map(cat => `<option value="${cat}" class="bg-gray-800">${cat}</option>`).join('')}
+                </select>
+            `;
+
+
+            const html = `
+                <div class="max-w-7xl mx-auto space-y-6 fade-in">
+                    
+                    <!-- 报告总览与操作 -->
+                    <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-primary sticky top-0 bg-gray-900 z-10">
+                         <h1 class="text-3xl font-extrabold text-blue-400">合规报告详情 <span class="text-xl text-gray-400">(微聊 V3.2.1)</span></h1>
+                         <div class="flex space-x-3 mt-3 sm:mt-0">
+                             <button class="text-sm px-4 py-2 bg-indigo-600 rounded-xl hover:bg-indigo-700 transition font-medium">导出整改清单</button>
+                             <button class="text-sm px-4 py-2 bg-gray-600 rounded-xl hover:bg-gray-500 transition font-medium">对比历史版本</button>
+                         </div>
+                    </header>
+                    
+                    <!-- 顶部分析统计卡片 -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="p-4 bg-card rounded-xl text-center shadow-lg border-b-4 border-red-500">
+                            <p class="text-xs text-gray-400">总风险项</p>
+                            <p class="text-4xl font-extrabold text-red-400">5</p>
+                        </div>
+                        <div class="p-4 bg-card rounded-xl text-center shadow-lg border-b-4 border-yellow-500">
+                            <p class="text-xs text-gray-400">待处理高/中风险</p>
+                            <p class="text-4xl font-extrabold text-yellow-400">3</p>
+                        </div>
+                        <div class="p-4 bg-card rounded-xl text-center shadow-lg border-b-4 border-green-500">
+                            <p class="text-xs text-gray-400">已处理数量</p>
+                            <p class="text-4xl font-extrabold text-green-400">1</p>
+                        </div>
+                        <div class="p-4 bg-card rounded-xl text-center shadow-lg border-b-4 border-blue-500">
+                            <p class="text-xs text-gray-400">合规率评分</p>
+                            <p class="text-4xl font-extrabold text-blue-400">92<span class="text-xl">%</span></p>
+                        </div>
+                    </div>
+
+                    <!-- 核心两栏布局 -->
+                    <div class="flex flex-col lg:flex-row space-y-6 lg:space-y-0 lg:space-x-6">
+                        
+                        <!-- 左栏: 隐私政策文本与高亮 -->
+                        <div class="lg:w-1/2 w-full bg-card p-6 rounded-xl shadow-2xl space-y-4 border border-primary">
+                            <div class="flex justify-between items-center border-b border-gray-700 pb-3">
+                                <h2 class="text-2xl font-semibold text-gray-200">政策文本与违规定位</h2>
+                                <div class="flex space-x-3 items-center">
+                                    <span class="text-sm text-gray-400">筛选高亮:</span>
+                                    ${filterSelectHtml}
+                                </div>
+                            </div>
+                            
+                            <!-- 文本内容，绑定点击事件 -->
+                            <div id="policyTextContainer" class="h-[650px] overflow-y-auto hide-scrollbar text-sm text-primary leading-relaxed space-y-4 p-2">
+                                <p class="text-xs text-gray-500 mb-4 bg-gray-800 p-3 rounded-lg border-l-2 border-blue-400">（违规内容已高亮显示，点击高亮部分可联动右侧风险项进行处理。）</p>
+                                ${policyText}
+                            </div>
+                        </div>
+
+                        <!-- 右栏: 风险摘要、处理与法规参考 -->
+                        <div class="lg:w-1/2 w-full flex flex-col space-y-6">
+                            
+                            <!-- 模块 A: 风险点摘要列表 -->
+                            <div class="bg-card p-6 rounded-xl shadow-2xl space-y-4 flex-none border border-primary">
+                                <h2 class="text-xl font-semibold text-red-400 border-b border-gray-700 pb-3">风险点摘要列表</h2>
+                                <div id="riskSummaryList" class="text-sm h-72 overflow-y-auto hide-scrollbar pr-2">
+                                    ${riskSummaryHtml}
+                                </div>
+                            </div>
+
+                            <!-- 模块 B: 风险处理区 -->
+                            <div id="riskHandlingAreaWrapper" class="bg-card p-6 rounded-xl shadow-2xl space-y-4 flex-none border border-primary">
+                                <h2 class="text-xl font-semibold text-blue-400 border-b border-gray-700 pb-3">风险处理与备注</h2>
+                                <div id="riskHandlingArea" class="space-y-3 min-h-[120px]">
+                                    <p class="text-gray-500 text-sm p-4 text-center">请点击上方的风险项卡片进行处理。</p>
+                                </div>
+                            </div>
+                            
+                            <!-- 模块 C: 关联法规与案例 -->
+                            <div class="bg-card p-6 rounded-xl shadow-2xl space-y-4 flex-grow border border-primary">
+                                <h2 class="text-xl font-semibold text-green-400 border-b border-gray-700 pb-3">关联法规与案例参考</h2>
+                                <div id="associatedLawArea" class="space-y-3 min-h-[200px]">
+                                    <p class="text-gray-500 text-sm p-4 text-center">点击风险项后，此处将显示关联法规。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 注册事件监听器：点击高亮文本触发联动
+            setTimeout(() => {
+                const container = document.getElementById('policyTextContainer');
+                if (container) {
+                    container.addEventListener('click', (e) => {
+                        const target = e.target.closest('.violation-highlight');
+                        if (target) {
+                            const riskId = parseInt(target.getAttribute('data-risk-id'));
+                            handleRiskClick(riskId);
+                        }
+                    });
+                }
+                
+                // 默认选中第一个风险项
+                if (risks.length > 0) {
+                     handleRiskClick(risks[0].id);
+                }
+
+            }, 0);
+            return html;
+        }
+
+        /**
+         * 渲染管理员专属页面：法规/案例库维护页 (Page VI)
+         */
+        function renderAdminPage() {
+            if (!isUserAdmin) return `<div class="p-8 text-center text-red-500 bg-card rounded-xl shadow-lg mt-10">❌ 权限不足，请以管理员身份登录。</div>`;
+            const html = `
+                <div class="max-w-7xl mx-auto space-y-8 fade-in">
+                    <h1 class="text-3xl font-extrabold text-white border-b border-primary pb-3">法规/案例库维护 (管理员)</h1>
+
+                    <!-- 导入与搜索 -->
+                    <div class="bg-card p-6 rounded-xl shadow-xl space-y-4 border border-primary">
+                        <div class="flex flex-col md:flex-row gap-4">
+                            <div class="relative flex-grow">
+                                <input type="text" placeholder="模糊搜索（关键词、标签、ID）" class="w-full p-3 pl-10 rounded-xl bg-gray-700 border border-gray-600 focus:border-blue-500 text-white">
+                                <svg class="w-5 h-5 absolute top-1/2 transform -translate-y-1/2 left-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                            </div>
+                            <button class="px-6 py-3 bg-green-600 rounded-xl hover:bg-green-700 transition text-sm whitespace-nowrap font-medium">批量导入 (Excel)</button>
+                            <button class="px-6 py-3 bg-blue-600 rounded-xl hover:bg-blue-700 transition text-sm whitespace-nowrap font-medium">手动新增</button>
+                        </div>
+                        <div class="flex flex-wrap gap-2 text-sm text-gray-400 pt-2 border-t border-gray-700">
+                            <span class="px-3 py-1 bg-gray-700 rounded-full">标签：国内法规 <button class="ml-1 text-xs text-gray-400 hover:text-white">✕</button></span>
+                            <span class="px-3 py-1 bg-gray-700 rounded-full">高风险案例 <button class="ml-1 text-xs text-gray-400 hover:text-white">✕</button></span>
+                            <span class="text-gray-500 italic text-xs self-center">已匹配关键词高亮</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 数据列表 (Mock) -->
+                    <div class="overflow-x-auto bg-card rounded-xl shadow-xl border border-primary">
+                        <table class="min-w-full divide-y divide-gray-700">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th class="p-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">ID</th>
+                                    <th class="p-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">类型/标题</th>
+                                    <th class="p-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">分类标签</th>
+                                    <th class="p-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">更新时间</th>
+                                    <th class="p-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-700">
+                                <tr class="hover:bg-gray-700 transition">
+                                    <td class="p-4 text-sm text-blue-400">L001</td>
+                                    <td class="p-4 text-sm">法规：个人信息保护法</td>
+                                    <td class="p-4 text-sm">国内/核心</td>
+                                    <td class="p-4 text-sm">2025-10-01</td>
+                                    <td class="p-4 text-sm space-x-2">
+                                        <button class="text-yellow-400 hover:text-yellow-300">编辑</button>
+                                        <button class="text-red-400 hover:text-red-300">删除</button>
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-gray-700 transition">
+                                    <td class="p-4 text-sm text-blue-400">C005</td>
+                                    <td class="p-4 text-sm">案例：某APP强制授权案</td>
+                                    <td class="p-4 text-sm">高风险/国内</td>
+                                    <td class="p-4 text-sm">2025-11-10</td>
+                                    <td class="p-4 text-sm space-x-2">
+                                        <button class="text-yellow-400 hover:text-yellow-300">编辑</button>
+                                        <button class="text-red-400 hover:text-red-300">删除</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            return html;
+        }
+
+        /**
+         * 渲染系统辅助页面：操作日志页 (Page VII)
+         */
+        function renderLogsPage() {
+            // 模拟数据
+            const logs = [
+                { id: 1, user: 'Admin', type: '数据导入', obj: '法规库', time: '2025-11-16 11:00', result: '成功' },
+                { id: 2, user: 'UserA', type: '提交检测', obj: '微聊 V3.2.1', time: '2025-11-16 10:30', result: '成功' },
+                { id: 3, user: 'UserA', type: '报告下载', obj: '1001', time: '2025-11-16 10:40', result: '成功' },
+                { id: 4, user: 'UserB', type: '忘记密码', obj: 'UserB', time: '2025-11-15 15:00', result: '失败' },
+            ];
+
+            const tableRowsHtml = logs.map(l => `
+                <tr class="border-b border-gray-700 hover:bg-gray-700 transition duration-150 cursor-pointer">
+                    <td class="p-4 text-sm text-blue-400">${l.user}</td>
+                    <td class="p-4 text-sm">${l.type}</td>
+                    <td class="p-4 text-sm">${l.obj}</td>
+                    <td class="p-4 text-sm">${l.time}</td>
+                    <td class="p-4 text-sm">
+                        <span class="px-3 py-1 text-xs font-semibold rounded-full ${l.result === '成功' ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}">
+                            ${l.result}
+                        </span>
+                    </td>
+                    <td class="p-4 text-sm">
+                        <button class="text-blue-400 hover:text-blue-300">详情/展开</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            const html = `
+                <div class="max-w-7xl mx-auto space-y-8 fade-in">
+                    <h1 class="text-3xl font-extrabold text-white border-b border-primary pb-3">操作日志</h1>
+
+                    <!-- 筛选与控制区 -->
+                    <div class="bg-card p-4 rounded-xl shadow-xl space-y-4 border border-primary">
+                        <div class="flex flex-wrap gap-3">
+                            <input type="text" placeholder="筛选：操作人" class="p-2 rounded-xl bg-gray-700 border border-gray-600 text-sm">
+                            <select class="p-2 rounded-xl bg-gray-700 border border-gray-600 text-sm">
+                                <option>筛选：操作类型</option>
+                            </select>
+                            <select class="p-2 rounded-xl bg-gray-700 border border-gray-600 text-sm">
+                                <option>筛选：结果</option>
+                            </select>
+                            <input type="date" class="p-2 rounded-xl bg-gray-700 border border-gray-600 text-sm text-gray-300">
+                        </div>
+                        <div class="flex justify-end gap-3 pt-2 border-t border-gray-700">
+                            <button class="px-4 py-2 text-sm bg-red-600 rounded-xl hover:bg-red-700 transition font-medium">批量删除日志</button>
+                            <button class="px-4 py-2 text-sm bg-indigo-600 rounded-xl hover:bg-indigo-700 transition font-medium">日志导出 (Excel)</button>
+                        </div>
+                    </div>
+
+                    <!-- 日志表格 -->
+                    <div class="overflow-x-auto bg-card rounded-xl shadow-xl border border-primary">
+                        <table class="min-w-full divide-y divide-gray-700">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th class="p-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">操作人</th>
+                                    <th class="p-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">类型</th>
+                                    <th class="p-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">对象</th>
+                                    <th class="p-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">时间</th>
+                                    <th class="p-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">结果</th>
+                                    <th class="p-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-700">
+                                ${tableRowsHtml}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            return html;
+        }
+
+        // --- SPA 核心逻辑 ---
+
+        const pageRenderers = {
+            'login': renderLoginPage,
+            'upload': renderUploadPage,
+            'report-list': renderReportListPage,
+            'report-detail': renderReportDetailPage,
+            'admin': renderAdminPage,
+            'logs': renderLogsPage
+        };
+
+        /**
+         * 切换页面视图
+         * @param {string} pageName 目标页面名称
+         */
+        function renderPage(pageName) {
+            // 权限检查：非登录状态只能看登录页
+            if (!isUserLoggedIn && pageName !== 'login') {
+                pageName = 'login';
+            }
+            
+            // 权限检查：非管理员不能看 Admin 页
+            if (pageName === 'admin' && !isUserAdmin) {
+                 pageName = 'upload'; // 默认跳转到上传页
+            }
+
+            currentPage = pageName;
+            
+            // 渲染主内容
+            mainContentEl.innerHTML = pageRenderers[pageName]();
+            
+            // 切换导航栏激活状态
+            document.querySelectorAll('.nav-item').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.getAttribute('data-page') === pageName) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            // 关闭移动端侧边栏
+            sidebarEl.classList.remove('open');
+            sidebarOverlayEl.classList.add('hidden');
+        }
+
+        // 监听侧边导航栏点击事件
+        sidebarEl.addEventListener('click', (event) => {
+            const button = event.target.closest('.nav-item');
+            if (button && !button.disabled) {
+                const targetPage = button.getAttribute('data-page');
+                if (targetPage === 'login') {
+                    // 如果已登录，点击登录按钮执行退出操作
+                    if (isUserLoggedIn) {
+                        toggleAuth();
+                    } else {
+                         renderPage('login');
+                    }
+                } else {
+                    renderPage(targetPage);
+                }
+            }
+        });
+
+        // 初始加载：默认渲染登录页
+        window.onload = () => {
+            renderPage('login');
+        };
+
+    </script>
+</body>
+</html>

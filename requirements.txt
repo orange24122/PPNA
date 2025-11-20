@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+pydantic
+pydantic-settings
+celery
+redis
+pytest
+python-multipart
+transformers
+torch
+xgboost
+openai
+httpx
+pymilvus
+

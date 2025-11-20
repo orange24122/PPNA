@@ -1,0 +1,55 @@
+# 环境配置指南
+
+本项目使用 `pydantic-settings` 从 `.env` 中加载配置。请在项目根目录创建 `.env` 文件（如果当前环境限制创建以点开头的文件，可先创建 `env.local` 并在部署前手动重命名），内容示例如下：
+
+```
+# 应用基础配置
+APP_NAME=社交类APP隐私政策合规检测系统
+API_PREFIX=/api/v1
+
+# PostgreSQL
+POSTGRES_USER=ppna_user
+POSTGRES_PASSWORD=ppna_password
+POSTGRES_DB=ppna_db
+POSTGRES_HOST=127.0.0.1
+POSTGRES_PORT=5432
+
+# Celery / Redis
+CELERY_BROKER_URL=redis://127.0.0.1:6379/0
+CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/1
+CELERY_DEFAULT_QUEUE=detection_queue
+
+# Milvus
+MILVUS_HOST=127.0.0.1
+MILVUS_PORT=19530
+MILVUS_COLLECTION=privacy_policy_knowledge
+
+# 模型 / 推理配置
+DASHSCOPE_API_KEY=sk-your-api-key
+DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+DASHSCOPE_EMBED_MODEL=text-embedding-v4
+DASHSCOPE_MOE_MODEL=qwen3-30b-a3b-instruct-2507
+BERT_MODEL_NAME=hfl/chinese-bert-wwm-ext
+BERT_MAX_CHUNK_TOKENS=360
+RISK_MODEL_PATH=models/risk_classifier.json
+```
+
+## 配置说明
+
+- **PostgreSQL**：用于持久化检测任务与报告。请确保数据库已创建，并赋予 `POSTGRES_USER` 对应的访问权限。
+- **Redis**：作为 Celery 的 broker/result backend。若使用 RabbitMQ，可改写 `CELERY_BROKER_URL` 为 `amqp://...`。
+- **Milvus**：RAG 检索用向量库，`MILVUS_COLLECTION` 需提前建立或在数据加载脚本中初始化。
+
+## 使用方式
+
+1. 按上述示例创建 `.env` 并填入实际值。
+2. 运行 `pip install -r requirements.txt` 安装依赖。
+3. 启动服务：
+   - `uvicorn main:app --reload`
+   - `celery -A app.tasks.celery_app.celery_app worker --loglevel=info`
+4. 可执行 `python data_loader.py` 将模拟知识数据写入 `knowledge_base` 表。
+
+若在某些环境中无法创建 `.env` 文件，可：
+- 在系统环境变量中设置同名键值；
+- 或者创建 `env.local`，并在 `Settings.Config` 中将 `env_file` 改为该文件名。
+
